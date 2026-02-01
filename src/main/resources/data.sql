@@ -1,13 +1,10 @@
 -- =====================================================
 -- SMART HIRING SYSTEM - INITIAL DATA
 -- =====================================================
--- This file inserts essential data required for the application
--- =====================================================
-
-USE smart_hiring_db;
 
 -- =====================================================
 -- INSERT ROLES (REQUIRED)
+-- Using ENUM names: ROLE_ADMIN, ROLE_HR, ROLE_CANDIDATE
 -- =====================================================
 INSERT INTO roles (id, name, description) VALUES
                                               (1, 'ROLE_ADMIN', 'System Administrator with full access'),
@@ -19,8 +16,8 @@ INSERT INTO roles (id, name, description) VALUES
 -- INSERT DEFAULT ADMIN USER
 -- Password: Admin@123 (BCrypt encoded)
 -- =====================================================
-INSERT INTO users (id, email, password, full_name, phone, is_active, email_verified) VALUES
-    (1, 'admin@smarthiring.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqzuJLdPVVCGKBLPMNNODtQMsEXfC', 'System Admin', '9999999999', TRUE, TRUE)
+INSERT INTO users (id, email, password, full_name, phone, is_active, email_verified, created_at, updated_at) VALUES
+    (1, 'admin@smarthiring.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqzuJLdPVVCGKBLPMNNODtQMsEXfC', 'System Admin', '9999999999', TRUE, TRUE, NOW(), NOW())
     ON DUPLICATE KEY UPDATE email = VALUES(email);
 
 -- Assign ADMIN role to admin user
@@ -31,8 +28,8 @@ INSERT INTO user_roles (user_id, role_id) VALUES (1, 1)
 -- INSERT DEMO HR USER
 -- Password: Hr@12345 (BCrypt encoded)
 -- =====================================================
-INSERT INTO users (id, email, password, full_name, phone, is_active, email_verified) VALUES
-    (2, 'hr@smarthiring.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'HR Manager', '8888888888', TRUE, TRUE)
+INSERT INTO users (id, email, password, full_name, phone, is_active, email_verified, created_at, updated_at) VALUES
+    (2, 'hr@smarthiring.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'HR Manager', '8888888888', TRUE, TRUE, NOW(), NOW())
     ON DUPLICATE KEY UPDATE email = VALUES(email);
 
 -- Assign HR role to HR user
@@ -42,14 +39,4 @@ INSERT INTO user_roles (user_id, role_id) VALUES (2, 2)
 -- =====================================================
 -- VERIFICATION
 -- =====================================================
-SELECT 'Roles inserted:' as Info;
-SELECT * FROM roles;
-
-SELECT 'Users inserted:' as Info;
-SELECT id, email, full_name, is_active FROM users;
-
-SELECT 'User roles assigned:' as Info;
-SELECT u.email, r.name as role
-FROM users u
-         JOIN user_roles ur ON u.id = ur.user_id
-         JOIN roles r ON ur.role_id = r.id;
+SELECT 'Initial data loaded successfully!' as Status;

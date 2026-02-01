@@ -33,5 +33,5 @@ An AI-Powered Smart Hiring System built with Spring Boot that automates the recr
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/smart-hiring-system.git
+git clone https://github.com/yashpal8078/smart-hiring-system.git
 cd smart-hiring-system

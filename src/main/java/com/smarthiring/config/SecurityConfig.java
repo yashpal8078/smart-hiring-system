@@ -14,44 +14,22 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // All public URLs that don't need authentication
-    private static final String[] PUBLIC_URLS = {
-            "/api/health",
-            "/api/",
-            "/api/auth/**",
-
-            // Swagger UI v3 (OpenAPI)
-            "/v3/api-docs/**",
-            "/v3/api-docs.yaml",
-            "/swagger-ui/**",
-            "/swagger-ui.html",
-            "/swagger-resources/**",
-            "/webjars/**",
-            "/api-docs/**",
-
-            // Error page
-            "/error"
-    };
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 // Disable CSRF for REST API
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Disable frame options for H2 console (if used)
+                // Disable frame options
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
-                // Configure authorization
+                // TEMPORARILY ALLOW ALL REQUESTS FOR DEVELOPMENT
+                // We will secure this properly in Step 6 (Security & JWT)
                 .authorizeHttpRequests(auth -> auth
-                        // Allow public URLs
-                        .requestMatchers(PUBLIC_URLS).permitAll()
-
-                        // All other requests need authentication
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
 
-                // Stateless session (for JWT)
+                // Stateless session
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 );
