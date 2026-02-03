@@ -1,5 +1,7 @@
 package com.smarthiring.config;
 
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
@@ -11,6 +13,13 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 @Configuration
+@SecurityScheme(
+        name = "bearerAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT",
+        description = "Enter JWT token"
+)
 public class SwaggerConfig {
 
     @Bean
@@ -18,7 +27,10 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("Smart Hiring System API")
-                        .description("AI-Powered Smart Hiring System REST API Documentation")
+                        .description("AI-Powered Smart Hiring System REST API Documentation\n\n" +
+                                "## Authentication\n" +
+                                "Use the `/api/auth/login` endpoint to get a JWT token.\n" +
+                                "Then click 'Authorize' button and enter: `Bearer <your-token>`")
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("yashpal parmar")
