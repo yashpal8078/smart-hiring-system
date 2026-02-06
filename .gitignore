@@ -1,33 +1,50 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+# =====================================================
+# GITIGNORE FOR SMART HIRING SYSTEM
+# =====================================================
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
+# ==================== IDE ====================
+.idea/
 *.iml
 *.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
+*.iws
 .vscode/
+*.swp
+*.swo
+
+# ==================== BUILD ====================
+target/
+build/
+out/
+*.jar
+*.war
+*.class
+
+# ==================== MAVEN ====================
+.mvn/
+mvnw
+mvnw.cmd
+
+# ==================== LOGS ====================
+*.log
+logs/
+
+# ==================== OS ====================
+.DS_Store
+Thumbs.db
+
+# ==================== ENVIRONMENT ====================
+.env
+.env.local
+*.env
+
+# ==================== UPLOADS ====================
+uploads/
+/uploads/
+
+# ==================== TEMPORARY ====================
+*.tmp
+*.temp
+
+# ==================== SECRETS ====================
+**/application-local.properties
+**/secrets/
