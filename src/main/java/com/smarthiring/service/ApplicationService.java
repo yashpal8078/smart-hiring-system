@@ -19,6 +19,7 @@ import com.smarthiring.repository.JobRepository;
 import com.smarthiring.repository.ResumeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,7 +32,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ApplicationService {
 
@@ -41,6 +41,25 @@ public class ApplicationService {
     private final ResumeRepository resumeRepository;
     private final ApplicationMapper applicationMapper;
     private final NotificationService notificationService;
+    private final AIRankingService aiRankingService;
+
+    public ApplicationService(
+            ApplicationRepository applicationRepository,
+            JobRepository jobRepository,
+            CandidateRepository candidateRepository,
+            ResumeRepository resumeRepository,
+            ApplicationMapper applicationMapper,
+            NotificationService notificationService,
+            @Lazy AIRankingService aiRankingService
+    ) {
+        this.applicationRepository = applicationRepository;
+        this.jobRepository = jobRepository;
+        this.candidateRepository = candidateRepository;
+        this.resumeRepository = resumeRepository;
+        this.applicationMapper = applicationMapper;
+        this.notificationService = notificationService;
+        this.aiRankingService = aiRankingService;
+    }
 
     /**
      * Apply for a job
@@ -98,6 +117,15 @@ public class ApplicationService {
 
         // Increment job application count
         jobRepository.incrementApplicationCount(job.getId());
+
+        // Calculate AI score automatically
+        try {
+            aiRankingService.calculateScore(savedApplication);
+            log.info("AI score calculated for application: {}", savedApplication.getId());
+        } catch (Exception e) {
+            log.warn("Could not calculate AI score for application {}: {}",
+                    savedApplication.getId(), e.getMessage());
+        }
 
         // Send notification to HR
         notificationService.sendApplicationReceivedNotification(job, candidate);
