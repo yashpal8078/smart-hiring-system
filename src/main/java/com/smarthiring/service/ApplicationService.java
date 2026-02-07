@@ -17,7 +17,6 @@ import com.smarthiring.repository.ApplicationRepository;
 import com.smarthiring.repository.CandidateRepository;
 import com.smarthiring.repository.JobRepository;
 import com.smarthiring.repository.ResumeRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -42,7 +41,9 @@ public class ApplicationService {
     private final ApplicationMapper applicationMapper;
     private final NotificationService notificationService;
     private final AIRankingService aiRankingService;
+    private final EmailService emailService;
 
+    // Constructor injection with @Lazy for circular dependency
     public ApplicationService(
             ApplicationRepository applicationRepository,
             JobRepository jobRepository,
@@ -50,7 +51,8 @@ public class ApplicationService {
             ResumeRepository resumeRepository,
             ApplicationMapper applicationMapper,
             NotificationService notificationService,
-            @Lazy AIRankingService aiRankingService
+            @Lazy AIRankingService aiRankingService,
+            EmailService emailService
     ) {
         this.applicationRepository = applicationRepository;
         this.jobRepository = jobRepository;
@@ -59,6 +61,7 @@ public class ApplicationService {
         this.applicationMapper = applicationMapper;
         this.notificationService = notificationService;
         this.aiRankingService = aiRankingService;
+        this.emailService = emailService;
     }
 
     /**
@@ -66,6 +69,8 @@ public class ApplicationService {
      */
     @Transactional
     public ApplicationResponse applyForJob(ApplicationRequest request, Long userId) {
+        log.info("Processing job application for user: {} and job: {}", userId, request.getJobId());
+
         // Get candidate
         Candidate candidate = candidateRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate", "userId", userId));
@@ -127,10 +132,27 @@ public class ApplicationService {
                     savedApplication.getId(), e.getMessage());
         }
 
-        // Send notification to HR
-        notificationService.sendApplicationReceivedNotification(job, candidate);
+        // Send in-app notification to HR
+        try {
+            notificationService.sendApplicationReceivedNotification(job, candidate);
+        } catch (Exception e) {
+            log.warn("Could not send in-app notification: {}", e.getMessage());
+        }
 
-        log.info("Application created: {} for job: {} by candidate: {}",
+        // Send emails (async - won't block the response)
+        try {
+            // Email to candidate confirming application
+            emailService.sendApplicationConfirmationEmail(savedApplication);
+
+            // Email to HR about new application
+            emailService.sendApplicationReceivedEmailToHR(savedApplication);
+
+            log.info("Application emails queued for sending");
+        } catch (Exception e) {
+            log.warn("Could not queue application emails: {}", e.getMessage());
+        }
+
+        log.info("Application created successfully: {} for job: {} by candidate: {}",
                 savedApplication.getId(), job.getId(), candidate.getId());
 
         return applicationMapper.toResponse(savedApplication);
@@ -203,17 +225,26 @@ public class ApplicationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Application", "id", applicationId));
 
         ApplicationStatus oldStatus = application.getStatus();
-        application.setStatus(request.getStatus());
-        application.setHrNotes(request.getNotes());
+        ApplicationStatus newStatus = request.getStatus();
+
+        // Update status
+        application.setStatus(newStatus);
+        if (request.getNotes() != null) {
+            application.setHrNotes(request.getNotes());
+        }
         application.setUpdatedAt(LocalDateTime.now());
 
         Application savedApplication = applicationRepository.save(application);
 
-        // Send notification to candidate
-        notificationService.sendStatusUpdateNotification(application, oldStatus, request.getStatus());
+        // Send notification and email to candidate about status change
+        try {
+            notificationService.sendStatusUpdateNotification(application, oldStatus, newStatus);
+            log.info("Status update notification sent for application: {}", applicationId);
+        } catch (Exception e) {
+            log.warn("Could not send status update notification: {}", e.getMessage());
+        }
 
-        log.info("Application {} status updated from {} to {}",
-                applicationId, oldStatus, request.getStatus());
+        log.info("Application {} status updated from {} to {}", applicationId, oldStatus, newStatus);
 
         return applicationMapper.toResponse(savedApplication);
     }
@@ -226,13 +257,17 @@ public class ApplicationService {
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application", "id", applicationId));
 
-        application.setHrRating(request.getRating());
-        application.setHrNotes(request.getNotes());
+        if (request.getRating() != null) {
+            application.setHrRating(request.getRating());
+        }
+        if (request.getNotes() != null) {
+            application.setHrNotes(request.getNotes());
+        }
         application.setUpdatedAt(LocalDateTime.now());
 
         Application savedApplication = applicationRepository.save(application);
 
-        log.info("HR review added to application: {}", applicationId);
+        log.info("HR review added to application: {} - Rating: {}", applicationId, request.getRating());
 
         return applicationMapper.toResponse(savedApplication);
     }
@@ -278,9 +313,11 @@ public class ApplicationService {
         // Can only withdraw if status is APPLIED or UNDER_REVIEW
         if (application.getStatus() != ApplicationStatus.APPLIED &&
                 application.getStatus() != ApplicationStatus.UNDER_REVIEW) {
-            throw new BadRequestException("Cannot withdraw application in current status");
+            throw new BadRequestException("Cannot withdraw application in current status: " +
+                    application.getStatus().getDisplayName());
         }
 
+        ApplicationStatus oldStatus = application.getStatus();
         application.setStatus(ApplicationStatus.WITHDRAWN);
         application.setUpdatedAt(LocalDateTime.now());
 
@@ -316,5 +353,89 @@ public class ApplicationService {
         return applicationRepository.findRecentApplications(pageable).stream()
                 .map(applicationMapper::toSimpleResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Get applications by status for a job
+     */
+    @Transactional(readOnly = true)
+    public PagedResponse<ApplicationResponse> getApplicationsByJobAndStatus(
+            Long jobId, ApplicationStatus status, int page, int size) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("appliedAt").descending());
+
+        Page<Application> applicationsPage = applicationRepository.findByJobIdAndStatus(jobId, status, pageable);
+
+        List<ApplicationResponse> content = applicationsPage.getContent().stream()
+                .map(applicationMapper::toResponse)
+                .collect(Collectors.toList());
+
+        return PagedResponse.of(
+                content,
+                applicationsPage.getNumber(),
+                applicationsPage.getSize(),
+                applicationsPage.getTotalElements(),
+                applicationsPage.getTotalPages()
+        );
+    }
+
+    /**
+     * Bulk update application status
+     */
+    @Transactional
+    public int bulkUpdateStatus(List<Long> applicationIds, ApplicationStatus newStatus, String notes) {
+        int updatedCount = 0;
+
+        for (Long appId : applicationIds) {
+            try {
+                Application application = applicationRepository.findById(appId).orElse(null);
+                if (application != null) {
+                    ApplicationStatus oldStatus = application.getStatus();
+                    application.setStatus(newStatus);
+                    if (notes != null) {
+                        application.setHrNotes(notes);
+                    }
+                    application.setUpdatedAt(LocalDateTime.now());
+                    applicationRepository.save(application);
+
+                    // Send notification
+                    notificationService.sendStatusUpdateNotification(application, oldStatus, newStatus);
+
+                    updatedCount++;
+                }
+            } catch (Exception e) {
+                log.warn("Failed to update application {}: {}", appId, e.getMessage());
+            }
+        }
+
+        log.info("Bulk updated {} applications to status: {}", updatedCount, newStatus);
+        return updatedCount;
+    }
+
+    /**
+     * Check if candidate has applied to job
+     */
+    @Transactional(readOnly = true)
+    public boolean hasApplied(Long jobId, Long userId) {
+        Candidate candidate = candidateRepository.findByUserId(userId).orElse(null);
+        if (candidate == null) {
+            return false;
+        }
+        return applicationRepository.existsByJobIdAndCandidateId(jobId, candidate.getId());
+    }
+
+    /**
+     * Get application by job and candidate
+     */
+    @Transactional(readOnly = true)
+    public ApplicationResponse getApplicationByJobAndUser(Long jobId, Long userId) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate", "userId", userId));
+
+        Application application = applicationRepository.findByJobIdAndCandidateId(jobId, candidate.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application", "jobId/candidateId",
+                        jobId + "/" + candidate.getId()));
+
+        return applicationMapper.toResponse(application);
     }
 }

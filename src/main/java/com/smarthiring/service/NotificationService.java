@@ -30,6 +30,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
 
     /**
      * Get notifications for a user
@@ -89,10 +90,11 @@ public class NotificationService {
     }
 
     /**
-     * Send notification for new application received
+     * Send notification for new application received (to HR)
      */
     @Transactional
     public void sendApplicationReceivedNotification(Job job, Candidate candidate) {
+        // Create in-app notification
         Notification notification = Notification.builder()
                 .user(job.getPostedBy())
                 .title("New Application Received")
@@ -105,15 +107,19 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
-
         log.debug("Application received notification sent to HR: {}", job.getPostedBy().getId());
+
+        // Note: Email is sent from ApplicationService when application is created
     }
 
     /**
-     * Send notification for application status update
+     * Send notification for application status update (to Candidate)
      */
     @Transactional
-    public void sendStatusUpdateNotification(Application application, ApplicationStatus oldStatus, ApplicationStatus newStatus) {
+    public void sendStatusUpdateNotification(Application application,
+                                             ApplicationStatus oldStatus,
+                                             ApplicationStatus newStatus) {
+        // Create in-app notification
         Notification notification = Notification.builder()
                 .user(application.getCandidate().getUser())
                 .title("Application Status Updated")
@@ -126,15 +132,19 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+        log.debug("Status update notification sent to candidate: {}",
+                application.getCandidate().getUser().getId());
 
-        log.debug("Status update notification sent to candidate: {}", application.getCandidate().getUser().getId());
+        // Send email
+        emailService.sendStatusUpdateEmail(application, oldStatus, newStatus);
     }
 
     /**
-     * Send notification for shortlist
+     * Send notification for shortlist (to Candidate)
      */
     @Transactional
     public void sendShortlistNotification(Shortlist shortlist) {
+        // Create in-app notification
         Notification notification = Notification.builder()
                 .user(shortlist.getCandidate().getUser())
                 .title("Congratulations! You've Been Shortlisted")
@@ -146,12 +156,15 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+        log.debug("Shortlist notification sent to candidate: {}",
+                shortlist.getCandidate().getUser().getId());
 
-        log.debug("Shortlist notification sent to candidate: {}", shortlist.getCandidate().getUser().getId());
+        // Send email
+        emailService.sendShortlistedEmail(shortlist);
     }
 
     /**
-     * Send notification for interview scheduled
+     * Send notification for interview scheduled (to Candidate)
      */
     @Transactional
     public void sendInterviewNotification(Shortlist shortlist) {
@@ -159,6 +172,7 @@ public class NotificationService {
             return;
         }
 
+        // Create in-app notification
         Notification notification = Notification.builder()
                 .user(shortlist.getCandidate().getUser())
                 .title("Interview Scheduled")
@@ -172,8 +186,11 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+        log.debug("Interview notification sent to candidate: {}",
+                shortlist.getCandidate().getUser().getId());
 
-        log.debug("Interview notification sent to candidate: {}", shortlist.getCandidate().getUser().getId());
+        // Send email
+        emailService.sendInterviewScheduledEmail(shortlist);
     }
 
     /**
