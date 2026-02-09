@@ -169,4 +169,5 @@ public interface JobRepository extends JpaRepository<Job, Long> {
      */
     @Query("SELECT j FROM Job j WHERE j.isActive = true ORDER BY j.applicationsCount DESC")
     List<Job> findMostAppliedJobs(Pageable pageable);
+
 }

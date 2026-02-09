@@ -87,15 +87,18 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
 
-                        // Public job viewing
+                        // Public job viewing (GET)
                         .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
+
+                        // ✅ FIX: Allow Job Search (POST) for everyone (or Candidates)
+                        .requestMatchers(HttpMethod.POST, "/api/jobs/search").permitAll()
 
                         // Admin only endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // HR and Admin endpoints
+                        // HR and Admin endpoints (Creating/Editing Jobs)
                         .requestMatchers("/api/hr/**").hasAnyRole("HR", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/jobs/**").hasAnyRole("HR", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/jobs/**").hasAnyRole("HR", "ADMIN") // This catches other POSTs like Create Job
                         .requestMatchers(HttpMethod.PUT, "/api/jobs/**").hasAnyRole("HR", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/jobs/**").hasAnyRole("HR", "ADMIN")
 

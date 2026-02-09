@@ -92,7 +92,10 @@ public class JobService {
     /**
      * Get job by ID with candidate context (check if applied)
      */
-    @Transactional(readOnly = true)
+    /**
+     * Get job by ID with candidate context (check if applied)
+     */
+    @Transactional
     public JobResponse getJobById(Long jobId, Long candidateId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job", "id", jobId));
@@ -306,4 +309,12 @@ public class JobService {
         }
         return count;
     }
+
+//    // Add this method inside JobService class
+//    public List<JobResponse> getJobsByPostedBy(User user) {
+//        List<Job> jobs = jobRepository.findByPostedById(user.getId());
+//        return jobs.stream()
+//                .map(jobMapper::toResponse)
+//                .collect(Collectors.toList());
+//    }
 }
